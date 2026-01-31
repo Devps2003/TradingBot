@@ -39,62 +39,61 @@ def check_password():
     # Get password from env or use default
     correct_password = os.getenv("TRADING_BOT_PASSWORD", "trader123")
     
-    def password_entered():
-        """Checks whether a password entered by the user is correct."""
-        if hashlib.sha256(st.session_state["password"].encode()).hexdigest() == \
-           hashlib.sha256(correct_password.encode()).hexdigest():
-            st.session_state["password_correct"] = True
-            del st.session_state["password"]  # Don't store the password
-        else:
-            st.session_state["password_correct"] = False
-
-    # First run or password not correct
+    # Initialize session state
     if "password_correct" not in st.session_state:
-        st.markdown("""
-        <style>
-            .stApp { background: linear-gradient(180deg, #0a0a1a 0%, #0f0f2a 100%); }
-            .login-box {
-                max-width: 400px;
-                margin: 100px auto;
-                padding: 40px;
-                background: rgba(255,255,255,0.03);
-                border-radius: 24px;
-                border: 1px solid rgba(255,255,255,0.1);
-                text-align: center;
-            }
-        </style>
-        <div class="login-box">
-            <div style="font-size: 4rem; margin-bottom: 20px;">🔐</div>
-            <div style="font-size: 1.5rem; font-weight: 700; color: #fff; margin-bottom: 10px;">
-                Trading Agent
-            </div>
-            <div style="color: rgba(255,255,255,0.5); margin-bottom: 30px;">
-                Enter your password to continue
-            </div>
+        st.session_state["password_correct"] = None
+    
+    # Already logged in
+    if st.session_state["password_correct"] == True:
+        return True
+    
+    # Show login page
+    st.markdown("""
+    <style>
+        .stApp { background: linear-gradient(180deg, #0a0a1a 0%, #0f0f2a 100%); }
+        .login-box {
+            max-width: 400px;
+            margin: 100px auto;
+            padding: 40px;
+            background: rgba(255,255,255,0.03);
+            border-radius: 24px;
+            border: 1px solid rgba(255,255,255,0.1);
+            text-align: center;
+        }
+    </style>
+    <div class="login-box">
+        <div style="font-size: 4rem; margin-bottom: 20px;">🔐</div>
+        <div style="font-size: 1.5rem; font-weight: 700; color: #fff; margin-bottom: 10px;">
+            Trading Agent
         </div>
-        """, unsafe_allow_html=True)
+        <div style="color: rgba(255,255,255,0.5); margin-bottom: 30px;">
+            Enter your password to continue
+        </div>
+    </div>
+    """, unsafe_allow_html=True)
+    
+    col1, col2, col3 = st.columns([1, 1, 1])
+    with col2:
+        password_input = st.text_input(
+            "Password", type="password", 
+            placeholder="Enter password...",
+            key="password_input"
+        )
         
-        col1, col2, col3 = st.columns([1, 1, 1])
-        with col2:
-            st.text_input(
-                "Password", type="password", key="password", on_change=password_entered,
-                placeholder="Enter password..."
-            )
-            st.caption("Default: `trader123` (change via TRADING_BOT_PASSWORD env var)")
-        return False
-    
-    # Password was entered wrong
-    elif not st.session_state["password_correct"]:
-        col1, col2, col3 = st.columns([1, 1, 1])
-        with col2:
-            st.text_input(
-                "Password", type="password", key="password", on_change=password_entered
-            )
+        if st.button("Login", use_container_width=True):
+            if password_input and hashlib.sha256(password_input.encode()).hexdigest() == \
+               hashlib.sha256(correct_password.encode()).hexdigest():
+                st.session_state["password_correct"] = True
+                st.rerun()
+            else:
+                st.error("😕 Incorrect password")
+        
+        if st.session_state["password_correct"] == False:
             st.error("😕 Incorrect password")
-        return False
+        
+        st.caption("Default: `trader123`")
     
-    # Password correct
-    return True
+    return False
 
 # Check password before showing anything
 if not check_password():

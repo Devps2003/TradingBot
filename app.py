@@ -363,8 +363,13 @@ def get_ai():
 
 @st.cache_data(ttl=300)
 def get_stock_data(symbol: str):
-    agent = get_agent()
-    return agent.research_stock(symbol, deep=True)
+    """Get comprehensive stock analysis using Pro Analyzer."""
+    try:
+        from src.analyzers.pro_analyzer import ProAnalyzer
+        analyzer = ProAnalyzer()
+        return analyzer.full_analysis(symbol)
+    except Exception as e:
+        return {"error": str(e), "symbol": symbol}
 
 
 @st.cache_data(ttl=300)
@@ -830,10 +835,11 @@ elif page == "💼 My Portfolio":
 
 elif page == "🔍 Research":
     st.markdown('<div class="gradient-text">Stock Research</div>', unsafe_allow_html=True)
+    st.markdown('<span style="color: rgba(255,255,255,0.5);">Professional-grade analysis for serious traders</span>', unsafe_allow_html=True)
     
     col1, col2 = st.columns([4, 1])
     with col1:
-        symbol = st.text_input("", value=st.session_state.current_symbol, placeholder="Enter symbol (e.g., RELIANCE, GOLDBEES)")
+        symbol = st.text_input("", value=st.session_state.current_symbol, placeholder="Enter symbol (e.g., RELIANCE, TCS, GOLDBEES)")
     with col2:
         st.markdown("<br>", unsafe_allow_html=True)
         analyze = st.button("🔍 Analyze", use_container_width=True)
@@ -842,95 +848,337 @@ elif page == "🔍 Research":
         st.session_state.current_symbol = symbol.upper()
     
     if st.session_state.current_symbol:
-        with st.spinner(f"Analyzing {st.session_state.current_symbol}..."):
+        with st.spinner(f"Running PRO analysis on {st.session_state.current_symbol}..."):
             data = get_stock_data(st.session_state.current_symbol)
             df = get_historical(st.session_state.current_symbol)
         
-        signal = data.get("signal", {})
-        advanced = data.get("advanced", {})
-        
-        # Signal display
-        sig = advanced.get("signal_strength", signal.get("signal", "HOLD"))
-        conf = signal.get("confidence", 50)
-        score = advanced.get("overall_score", 50)
-        
-        sig_class = "signal-buy" if "BUY" in sig else "signal-sell" if "SELL" in sig else "signal-hold"
-        
-        col1, col2 = st.columns([1, 2])
-        
-        with col1:
-            emoji = "🟢" if "BUY" in sig else "🔴" if "SELL" in sig else "🟡"
-            st.markdown(f"""
-            <div class="{sig_class}">
-                <div style="font-size: 4rem;">{emoji}</div>
-                <div style="font-size: 2rem; font-weight: 800; color: #fff; margin: 15px 0;">{sig}</div>
-                <div style="font-size: 1.2rem; color: rgba(255,255,255,0.7);">Confidence: {conf:.0f}%</div>
-                <div style="font-size: 1rem; color: rgba(255,255,255,0.5);">Score: {score:.0f}/100</div>
-                <div style="margin-top: 20px; display: flex; justify-content: center; gap: 30px;">
-                    <div>
-                        <div style="color: rgba(255,255,255,0.5); font-size: 0.8rem;">Entry</div>
-                        <div style="color: #fff; font-weight: 600;">₹{signal.get("entry_price", 0):,.2f}</div>
-                    </div>
-                    <div>
-                        <div style="color: rgba(255,255,255,0.5); font-size: 0.8rem;">Stop</div>
-                        <div style="color: #ff4757; font-weight: 600;">₹{signal.get("stop_loss", 0):,.2f}</div>
-                    </div>
-                    <div>
-                        <div style="color: rgba(255,255,255,0.5); font-size: 0.8rem;">Target</div>
-                        <div style="color: #00ff88; font-weight: 600;">₹{signal.get("target_1", 0):,.2f}</div>
+        if "error" in data:
+            st.error(f"Error: {data['error']}")
+        else:
+            # Extract data from pro analyzer
+            signal = data.get("signal", {})
+            trend = data.get("trend", {})
+            momentum = data.get("momentum", {})
+            volume = data.get("volume", {})
+            patterns = data.get("patterns", {})
+            levels = data.get("levels", {})
+            strength = data.get("relative_strength", {})
+            scores = data.get("scores", {})
+            risk = data.get("risk", {})
+            
+            sig = signal.get("signal", "HOLD")
+            conf = signal.get("confidence", 50)
+            score = scores.get("overall", 50)
+            
+            sig_class = "signal-buy" if "BUY" in sig else "signal-sell" if "SELL" in sig else "signal-hold"
+            
+            col1, col2 = st.columns([1, 2])
+            
+            with col1:
+                emoji = "🟢" if "BUY" in sig else "🔴" if "SELL" in sig else "🟡"
+                rr = signal.get("risk_reward_ratio", 0)
+                
+                st.markdown(f"""
+                <div class="{sig_class}">
+                    <div style="font-size: 3.5rem;">{emoji}</div>
+                    <div style="font-size: 1.8rem; font-weight: 800; color: #fff; margin: 10px 0;">{sig}</div>
+                    <div style="font-size: 1.1rem; color: rgba(255,255,255,0.7);">Confidence: {conf:.0f}%</div>
+                    <div style="font-size: 0.9rem; color: rgba(255,255,255,0.5);">Score: {score:.0f}/100 | R:R 1:{rr:.1f}</div>
+                    <div style="margin-top: 15px; display: flex; justify-content: center; gap: 20px;">
+                        <div>
+                            <div style="color: rgba(255,255,255,0.5); font-size: 0.75rem;">ENTRY</div>
+                            <div style="color: #fff; font-weight: 600;">₹{signal.get("entry_price", 0):,.2f}</div>
+                        </div>
+                        <div>
+                            <div style="color: rgba(255,255,255,0.5); font-size: 0.75rem;">STOP</div>
+                            <div style="color: #ff4757; font-weight: 600;">₹{signal.get("stop_loss", 0):,.2f}</div>
+                            <div style="color: #ff4757; font-size: 0.7rem;">-{signal.get("risk_pct", 0):.1f}%</div>
+                        </div>
+                        <div>
+                            <div style="color: rgba(255,255,255,0.5); font-size: 0.75rem;">TARGET</div>
+                            <div style="color: #00ff88; font-weight: 600;">₹{signal.get("targets", {}).get("target_1", 0):,.2f}</div>
+                            <div style="color: #00ff88; font-size: 0.7rem;">+{signal.get("reward_pct", 0):.1f}%</div>
+                        </div>
                     </div>
                 </div>
-            </div>
-            """, unsafe_allow_html=True)
-            
-            # Add to portfolio button
-            if st.button("➕ Add to Portfolio", use_container_width=True):
-                st.session_state.add_to_portfolio = st.session_state.current_symbol
-        
-        with col2:
-            chart = create_chart(df, st.session_state.current_symbol)
-            if chart:
-                st.plotly_chart(chart, use_container_width=True)
-        
-        # Personalized AI analysis
-        st.markdown("### 🤖 Personalized AI Analysis")
-        
-        if st.button("Get AI Recommendation Based on My Portfolio"):
-            with st.spinner("AI thinking..."):
-                ai = get_ai()
-                portfolio = get_smart_portfolio()
-                context = portfolio.get_context_for_ai()
-                analysis = ai.get_personalized_signal(
-                    st.session_state.current_symbol,
-                    signal,
-                    context
-                )
-            st.markdown(f'<div class="ai-bubble">{analysis}</div>', unsafe_allow_html=True)
-        
-        # Tabs for detailed analysis
-        tab1, tab2, tab3 = st.tabs(["📊 Technical", "📈 Momentum", "🎯 Scores"])
-        
-        with tab1:
-            tf = advanced.get("timeframes", {})
-            if tf:
-                col1, col2, col3 = st.columns(3)
+                """, unsafe_allow_html=True)
                 
-                for tf_name, col in zip(["daily", "weekly", "monthly"], [col1, col2, col3]):
-                    tf_data = tf.get(tf_name, {})
-                    trend = tf_data.get("trend", "N/A")
-                    t_color = "#00ff88" if "BULLISH" in trend else "#ff4757" if "BEARISH" in trend else "#ffd93d"
+                # Position sizing
+                st.markdown(f"""
+                <div class="glass-card" style="margin-top: 15px; padding: 15px;">
+                    <div class="metric-label">Recommended Position</div>
+                    <div style="font-size: 1.3rem; font-weight: 700;">{risk.get("recommended_shares", 0)} shares</div>
+                    <div style="color: rgba(255,255,255,0.5);">₹{risk.get("position_value", 0):,.0f} ({risk.get("position_pct", 0):.0f}% of capital)</div>
+                    <div style="margin-top: 10px; display: flex; justify-content: space-between;">
+                        <div><span style="color: #ff4757;">Max Loss:</span> ₹{risk.get("max_loss", 0):,.0f}</div>
+                        <div><span style="color: #00ff88;">Max Gain:</span> ₹{risk.get("max_gain_t1", 0):,.0f}</div>
+                    </div>
+                </div>
+                """, unsafe_allow_html=True)
+                
+                # Add to portfolio button
+                if st.button("➕ Add to Portfolio", use_container_width=True):
+                    st.session_state.add_to_portfolio = st.session_state.current_symbol
+            
+            with col2:
+                chart = create_chart(df, st.session_state.current_symbol)
+                if chart:
+                    st.plotly_chart(chart, use_container_width=True)
+            
+            # Detailed Analysis Tabs
+            tab1, tab2, tab3, tab4, tab5 = st.tabs(["📊 Trend", "📈 Momentum", "📉 Volume", "🎯 Patterns", "💪 Strength"])
+            
+            with tab1:
+                col1, col2 = st.columns(2)
+                with col1:
+                    daily_trend = trend.get("daily", "N/A")
+                    weekly_trend = trend.get("weekly", "N/A")
+                    aligned = "✅ ALIGNED" if trend.get("aligned") else "⚠️ NOT ALIGNED"
                     
-                    with col:
-                        st.markdown(f"""
-                        <div class="glass-card" style="text-align: center;">
-                            <div class="metric-label">{tf_name.upper()}</div>
-                            <div style="color: {t_color}; font-size: 1.1rem; font-weight: 600;">{trend}</div>
-                            <div style="margin-top: 10px;">
-                                <div style="color: rgba(255,255,255,0.5);">RSI: {tf_data.get("rsi", "N/A")}</div>
-                                <div style="color: rgba(255,255,255,0.5);">MACD: {tf_data.get("macd_signal", "N/A")}</div>
+                    d_color = "#00ff88" if daily_trend == "BULLISH" else "#ff4757" if daily_trend == "BEARISH" else "#ffd93d"
+                    w_color = "#00ff88" if weekly_trend == "BULLISH" else "#ff4757" if weekly_trend == "BEARISH" else "#ffd93d"
+                    
+                    st.markdown(f"""
+                    <div class="glass-card">
+                        <div class="metric-label">Trend Analysis</div>
+                        <div style="display: flex; justify-content: space-around; margin: 20px 0;">
+                            <div style="text-align: center;">
+                                <div style="color: rgba(255,255,255,0.5);">DAILY</div>
+                                <div style="color: {d_color}; font-size: 1.2rem; font-weight: 700;">{daily_trend}</div>
+                            </div>
+                            <div style="text-align: center;">
+                                <div style="color: rgba(255,255,255,0.5);">WEEKLY</div>
+                                <div style="color: {w_color}; font-size: 1.2rem; font-weight: 700;">{weekly_trend}</div>
                             </div>
                         </div>
+                        <div style="text-align: center; padding: 10px; background: rgba(255,255,255,0.05); border-radius: 10px;">
+                            {aligned}
+                        </div>
+                        <div style="margin-top: 15px;">
+                            <div>ADX: <strong>{trend.get("adx", 0):.0f}</strong> ({trend.get("strength", "N/A")})</div>
+                            <div>Above 200 EMA: <strong>{"✅ Yes" if trend.get("above_200ema") else "❌ No"}</strong></div>
+                        </div>
+                    </div>
+                    """, unsafe_allow_html=True)
+                
+                with col2:
+                    emas = trend.get("ema_values", {})
+                    st.markdown(f"""
+                    <div class="glass-card">
+                        <div class="metric-label">Moving Averages</div>
+                        <div style="margin-top: 15px;">
+                            <div style="display: flex; justify-content: space-between; padding: 8px 0; border-bottom: 1px solid rgba(255,255,255,0.1);">
+                                <span>EMA 8</span>
+                                <span style="font-weight: 600;">₹{emas.get("ema_8", 0):,.2f}</span>
+                            </div>
+                            <div style="display: flex; justify-content: space-between; padding: 8px 0; border-bottom: 1px solid rgba(255,255,255,0.1);">
+                                <span>EMA 21</span>
+                                <span style="font-weight: 600;">₹{emas.get("ema_21", 0):,.2f}</span>
+                            </div>
+                            <div style="display: flex; justify-content: space-between; padding: 8px 0; border-bottom: 1px solid rgba(255,255,255,0.1);">
+                                <span>EMA 50</span>
+                                <span style="font-weight: 600;">₹{emas.get("ema_50", 0):,.2f}</span>
+                            </div>
+                            <div style="display: flex; justify-content: space-between; padding: 8px 0;">
+                                <span>EMA 200</span>
+                                <span style="font-weight: 600;">₹{emas.get("ema_200", 0):,.2f}</span>
+                            </div>
+                        </div>
+                    </div>
+                    """, unsafe_allow_html=True)
+            
+            with tab2:
+                col1, col2 = st.columns(2)
+                with col1:
+                    rsi = momentum.get("rsi", 50)
+                    rsi_color = "#ff4757" if rsi > 70 else "#00ff88" if rsi < 30 else "#ffd93d"
+                    macd = momentum.get("macd", {})
+                    
+                    st.markdown(f"""
+                    <div class="glass-card">
+                        <div class="metric-label">RSI & MACD</div>
+                        <div style="text-align: center; margin: 20px 0;">
+                            <div style="font-size: 2.5rem; font-weight: 700; color: {rsi_color};">{rsi:.0f}</div>
+                            <div style="color: rgba(255,255,255,0.5);">RSI (14)</div>
+                            <div style="color: {rsi_color}; margin-top: 5px;">{momentum.get("condition", "N/A")}</div>
+                        </div>
+                        <div style="padding-top: 15px; border-top: 1px solid rgba(255,255,255,0.1);">
+                            <div>MACD: <span style="color: {"#00ff88" if macd.get("bullish") else "#ff4757"};">{"Bullish" if macd.get("bullish") else "Bearish"}</span></div>
+                            <div>Histogram: {"📈 Increasing" if macd.get("increasing") else "📉 Decreasing"}</div>
+                            <div>RSI Divergence: <strong>{momentum.get("rsi_divergence", "NONE")}</strong></div>
+                        </div>
+                    </div>
+                    """, unsafe_allow_html=True)
+                
+                with col2:
+                    stoch = momentum.get("stochastic", {})
+                    roc = momentum.get("roc", {})
+                    st.markdown(f"""
+                    <div class="glass-card">
+                        <div class="metric-label">Stochastic & ROC</div>
+                        <div style="margin-top: 15px;">
+                            <div style="display: flex; justify-content: space-between; padding: 8px 0;">
+                                <span>Stochastic %K</span>
+                                <span style="font-weight: 600; color: {"#ff4757" if stoch.get("overbought") else "#00ff88" if stoch.get("oversold") else "#fff"};">
+                                    {stoch.get("k", 0):.0f}
+                                </span>
+                            </div>
+                            <div style="display: flex; justify-content: space-between; padding: 8px 0;">
+                                <span>Stochastic %D</span>
+                                <span style="font-weight: 600;">{stoch.get("d", 0):.0f}</span>
+                            </div>
+                            <div style="display: flex; justify-content: space-between; padding: 8px 0; border-top: 1px solid rgba(255,255,255,0.1); margin-top: 10px;">
+                                <span>ROC (10d)</span>
+                                <span style="font-weight: 600; color: {"#00ff88" if roc.get("10d", 0) > 0 else "#ff4757"};">
+                                    {roc.get("10d", 0):+.1f}%
+                                </span>
+                            </div>
+                            <div style="display: flex; justify-content: space-between; padding: 8px 0;">
+                                <span>ROC (20d)</span>
+                                <span style="font-weight: 600; color: {"#00ff88" if roc.get("20d", 0) > 0 else "#ff4757"};">
+                                    {roc.get("20d", 0):+.1f}%
+                                </span>
+                            </div>
+                        </div>
+                    </div>
+                    """, unsafe_allow_html=True)
+            
+            with tab3:
+                smart_money = volume.get("smart_money", "NEUTRAL")
+                sm_color = "#00ff88" if smart_money == "ACCUMULATING" else "#ff4757" if smart_money == "DISTRIBUTING" else "#ffd93d"
+                
+                st.markdown(f"""
+                <div class="glass-card">
+                    <div class="metric-label">Smart Money Analysis</div>
+                    <div style="text-align: center; margin: 20px 0;">
+                        <div style="font-size: 1.5rem; font-weight: 700; color: {sm_color};">{smart_money}</div>
+                        <div style="color: rgba(255,255,255,0.5); margin-top: 5px;">
+                            {volume.get("accumulation_days", 0)} accumulation days vs {volume.get("distribution_days", 0)} distribution days
+                        </div>
+                    </div>
+                    <div style="display: flex; justify-content: space-around; padding-top: 15px; border-top: 1px solid rgba(255,255,255,0.1);">
+                        <div style="text-align: center;">
+                            <div style="color: rgba(255,255,255,0.5);">Volume Ratio</div>
+                            <div style="font-size: 1.3rem; font-weight: 600;">{volume.get("ratio", 1):.1f}x</div>
+                        </div>
+                        <div style="text-align: center;">
+                            <div style="color: rgba(255,255,255,0.5);">OBV Trend</div>
+                            <div style="font-size: 1.3rem; font-weight: 600; color: {"#00ff88" if volume.get("obv_trend") == "UP" else "#ff4757"};">
+                                {volume.get("obv_trend", "N/A")}
+                            </div>
+                        </div>
+                        <div style="text-align: center;">
+                            <div style="color: rgba(255,255,255,0.5);">Spike</div>
+                            <div style="font-size: 1.3rem; font-weight: 600;">{"🔥 Yes" if volume.get("spike") else "No"}</div>
+                        </div>
+                    </div>
+                </div>
+                """, unsafe_allow_html=True)
+            
+            with tab4:
+                pattern_list = patterns.get("patterns", [])
+                dominant = patterns.get("dominant", "NEUTRAL")
+                dom_color = "#00ff88" if dominant == "BULLISH" else "#ff4757" if dominant == "BEARISH" else "#ffd93d"
+                
+                st.markdown(f"""
+                <div class="glass-card">
+                    <div class="metric-label">Pattern Recognition</div>
+                    <div style="text-align: center; margin: 15px 0;">
+                        <span style="color: {dom_color}; font-weight: 700; font-size: 1.2rem;">{dominant}</span>
+                        <span style="color: rgba(255,255,255,0.5);"> bias detected</span>
+                    </div>
+                </div>
+                """, unsafe_allow_html=True)
+                
+                if pattern_list:
+                    for p in pattern_list:
+                        p_color = "#00ff88" if p["type"] == "BULLISH" else "#ff4757" if p["type"] == "BEARISH" else "#ffd93d"
+                        st.markdown(f"""
+                        <div style="padding: 10px; margin: 5px 0; background: rgba(255,255,255,0.03); border-radius: 10px; display: flex; justify-content: space-between;">
+                            <span style="color: {p_color};">● {p["name"]}</span>
+                            <span style="color: rgba(255,255,255,0.5);">Strength: {p["strength"]}</span>
+                        </div>
                         """, unsafe_allow_html=True)
+                else:
+                    st.info("No significant patterns detected")
+            
+            with tab5:
+                rs_score = strength.get("rs_score", 50)
+                vs_nifty = strength.get("vs_nifty", "N/A")
+                rs_color = "#00ff88" if rs_score >= 60 else "#ff4757" if rs_score <= 40 else "#ffd93d"
+                
+                st.markdown(f"""
+                <div class="glass-card">
+                    <div class="metric-label">Relative Strength vs Nifty</div>
+                    <div style="text-align: center; margin: 20px 0;">
+                        <div style="font-size: 3rem; font-weight: 700; color: {rs_color};">{rs_score:.0f}</div>
+                        <div style="color: {rs_color}; font-weight: 600;">{vs_nifty}</div>
+                    </div>
+                    <div class="progress-bar" style="margin: 15px 0;">
+                        <div class="progress-fill" style="width: {rs_score}%; background: {rs_color};"></div>
+                    </div>
+                    <div style="display: flex; justify-content: space-around; padding-top: 15px;">
+                        <div style="text-align: center;">
+                            <div style="color: rgba(255,255,255,0.5);">Alpha (1M)</div>
+                            <div style="color: {"#00ff88" if strength.get("alpha_1m", 0) > 0 else "#ff4757"}; font-weight: 600;">
+                                {strength.get("alpha_1m", 0):+.1f}%
+                            </div>
+                        </div>
+                        <div style="text-align: center;">
+                            <div style="color: rgba(255,255,255,0.5);">Alpha (3M)</div>
+                            <div style="color: {"#00ff88" if strength.get("alpha_3m", 0) > 0 else "#ff4757"}; font-weight: 600;">
+                                {strength.get("alpha_3m", 0):+.1f}%
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                """, unsafe_allow_html=True)
+                
+                # Key levels
+                st.markdown("### 🎯 Key Price Levels")
+                lvl = levels
+                st.markdown(f"""
+                <div class="glass-card">
+                    <div style="display: flex; justify-content: space-between;">
+                        <div>
+                            <div style="color: rgba(255,255,255,0.5);">Resistance</div>
+                            <div style="color: #ff4757; font-weight: 600;">₹{lvl.get("resistance", {}).get("nearest", 0):,.2f}</div>
+                            <div style="color: rgba(255,255,255,0.3);">+{lvl.get("resistance", {}).get("distance_pct", 0):.1f}% away</div>
+                        </div>
+                        <div style="text-align: center;">
+                            <div style="color: rgba(255,255,255,0.5);">Current</div>
+                            <div style="font-size: 1.3rem; font-weight: 700;">₹{lvl.get("current_price", 0):,.2f}</div>
+                            <div style="color: rgba(255,255,255,0.3);">{lvl.get("52week", {}).get("position_pct", 50):.0f}% of 52W range</div>
+                        </div>
+                        <div style="text-align: right;">
+                            <div style="color: rgba(255,255,255,0.5);">Support</div>
+                            <div style="color: #00ff88; font-weight: 600;">₹{lvl.get("support", {}).get("nearest", 0):,.2f}</div>
+                            <div style="color: rgba(255,255,255,0.3);">-{lvl.get("support", {}).get("distance_pct", 0):.1f}% away</div>
+                        </div>
+                    </div>
+                </div>
+                """, unsafe_allow_html=True)
+            
+            # AI Analysis section
+            st.markdown("---")
+            st.markdown("### 🤖 AI Recommendation")
+            
+            if st.button("Get Personalized AI Analysis", use_container_width=True):
+                with st.spinner("AI analyzing based on your portfolio..."):
+                    ai = get_ai()
+                    portfolio = get_smart_portfolio()
+                    context = portfolio.get_context_for_ai()
+                    analysis = ai.get_personalized_signal(
+                        st.session_state.current_symbol,
+                        data,
+                        context
+                    )
+                st.markdown(f'<div class="ai-bubble">{analysis}</div>', unsafe_allow_html=True)
+            
+            # Summary
+            if data.get("summary"):
+                st.markdown("### 📋 Quick Summary")
+                st.code(data["summary"], language=None)
         
         with tab2:
             momentum = advanced.get("momentum", {})
@@ -1004,79 +1252,128 @@ elif page == "🔍 Research":
 
 
 elif page == "📊 Scanner":
-    st.markdown('<div class="gradient-text">Opportunity Scanner</div>', unsafe_allow_html=True)
-    st.markdown('<span style="color: rgba(255,255,255,0.5);">Find profitable trades that match your style</span>', unsafe_allow_html=True)
+    st.markdown('<div class="gradient-text">💰 Money Maker Scanner</div>', unsafe_allow_html=True)
+    st.markdown('<span style="color: rgba(255,255,255,0.5);">Find high-probability, money-making opportunities</span>', unsafe_allow_html=True)
     
-    col1, col2, col3, col4 = st.columns(4)
+    # Scan type tabs
+    scan_type = st.radio(
+        "Scan Type",
+        ["🎯 Best Opportunities", "🚀 Breakouts", "🔄 Reversals", "💪 Momentum Leaders"],
+        horizontal=True
+    )
     
+    col1, col2, col3 = st.columns(3)
     with col1:
-        universe = st.selectbox("Universe", ["Nifty 50", "Nifty 100", "ETFs", "All Stocks"])
+        universe = st.selectbox("Universe", ["Nifty 50", "Nifty 100", "ETFs", "All"])
     with col2:
-        min_conf = st.slider("Min Confidence", 40, 80, 55)
+        min_score = st.slider("Min Score", 50, 80, 65)
     with col3:
-        signal_type = st.selectbox("Signal Type", ["All", "Strong Buy", "Buy", "Watchlist"])
-    with col4:
-        st.markdown("<br>", unsafe_allow_html=True)
-        scan = st.button("🚀 Scan Now", use_container_width=True)
+        min_rr = st.slider("Min R:R Ratio", 1.0, 3.0, 1.5, 0.5)
+    
+    scan = st.button("🚀 Scan Market", use_container_width=True)
     
     if scan:
-        with st.spinner("Scanning market for opportunities..."):
-            agent = get_agent()
-            
-            if universe == "ETFs":
-                from config.settings import ETF_LIST
-                result = agent.scan_opportunities(n=20, universe=ETF_LIST)
-            elif universe == "All Stocks":
-                from config.settings import FULL_UNIVERSE
-                result = agent.scan_opportunities(n=20, universe=FULL_UNIVERSE[:60])
-            else:
-                from config.settings import NIFTY_50
-                univ = NIFTY_50 if universe == "Nifty 50" else NIFTY_50 + NIFTY_50[:50]
-                result = agent.scan_opportunities(n=20, universe=univ)
+        from src.signals.money_maker import MoneyMaker
+        from config.settings import NIFTY_50, NIFTY_NEXT_50, ETF_LIST
         
-        opps = result.get("top_opportunities", [])
+        mm = MoneyMaker()
         
-        # Filter
-        if signal_type == "Strong Buy":
-            opps = [o for o in opps if o.get("signal") == "STRONG_BUY"]
-        elif signal_type == "Buy":
-            opps = [o for o in opps if o.get("signal") in ["BUY", "STRONG_BUY"]]
+        # Select universe
+        if universe == "ETFs":
+            univ = ETF_LIST
+        elif universe == "All":
+            univ = NIFTY_50 + NIFTY_NEXT_50[:30]
+        elif universe == "Nifty 100":
+            univ = NIFTY_50 + NIFTY_NEXT_50
+        else:
+            univ = NIFTY_50
         
-        opps = [o for o in opps if o.get("confidence", 0) >= min_conf]
+        with st.spinner(f"Scanning {len(univ)} stocks for money-making opportunities..."):
+            if scan_type == "🎯 Best Opportunities":
+                result = mm.scan_for_opportunities(universe=univ, min_score=min_score, min_rr=min_rr)
+                opps = result.get("top_opportunities", [])
+            elif scan_type == "🚀 Breakouts":
+                opps = mm.find_breakouts(universe=univ)
+            elif scan_type == "🔄 Reversals":
+                opps = mm.find_reversals(universe=univ)
+            else:  # Momentum Leaders
+                opps = mm.find_momentum_leaders(universe=univ)
         
         if opps:
-            st.success(f"Found {len(opps)} opportunities!")
+            st.success(f"🎯 Found {len(opps)} money-making opportunities!")
             
             for opp in opps:
-                sig = opp.get("signal", "HOLD")
-                conf = opp.get("confidence", 50)
-                sig_color = "#00ff88" if "BUY" in sig else "#ffd93d"
+                # Handle different scan types
+                signal_data = opp.get("signal", {})
+                if isinstance(signal_data, dict):
+                    sig = signal_data.get("signal", "BUY")
+                    conf = signal_data.get("confidence", 70)
+                    rr = signal_data.get("risk_reward_ratio", 2)
+                    entry = signal_data.get("entry_price", 0)
+                    stop = signal_data.get("stop_loss", 0)
+                    target = signal_data.get("targets", {}).get("target_1", 0)
+                else:
+                    sig = opp.get("signal", "BUY")
+                    conf = opp.get("confidence", 70)
+                    rr = opp.get("risk_reward_ratio", 2)
+                    entry = opp.get("entry_price", 0)
+                    stop = opp.get("stop_loss", 0)
+                    target = opp.get("target_1", 0)
                 
-                rr = opp.get("risk_reward_ratio", 0)
+                score = opp.get("overall_score", opp.get("score", 70))
+                symbol = opp.get("symbol", "")
+                
+                sig_color = "#00ff88" if "BUY" in str(sig) else "#ffd93d"
+                
+                # Additional info based on scan type
+                extra_info = ""
+                if scan_type == "🚀 Breakouts":
+                    pattern = opp.get("pattern", "Breakout")
+                    extra_info = f'<div style="color: #ffd93d;">📈 {pattern}</div>'
+                elif scan_type == "🔄 Reversals":
+                    rsi = opp.get("rsi", 0)
+                    div = opp.get("divergence", "")
+                    extra_info = f'<div style="color: #00ff88;">RSI: {rsi:.0f} | {div}</div>'
+                elif scan_type == "💪 Momentum Leaders":
+                    rs = opp.get("rs_score", 0)
+                    alpha = opp.get("alpha_1m", 0)
+                    extra_info = f'<div style="color: #667eea;">RS: {rs:.0f} | Alpha: {alpha:+.1f}%</div>'
                 
                 st.markdown(f"""
                 <div class="glass-card" style="display: flex; justify-content: space-between; align-items: center;">
                     <div>
-                        <div style="font-size: 1.3rem; font-weight: 700; color: #fff;">{opp.get("symbol", "")}</div>
+                        <div style="font-size: 1.4rem; font-weight: 700; color: #fff;">{symbol}</div>
                         <div style="color: {sig_color}; font-weight: 600;">{sig}</div>
+                        {extra_info}
+                    </div>
+                    <div style="text-align: center;">
+                        <div style="color: rgba(255,255,255,0.5);">Score</div>
+                        <div style="font-size: 1.8rem; font-weight: 700;">{score:.0f}</div>
                     </div>
                     <div style="text-align: center;">
                         <div style="color: rgba(255,255,255,0.5);">Confidence</div>
-                        <div style="font-size: 1.5rem; font-weight: 700;">{conf:.0f}%</div>
+                        <div style="font-size: 1.3rem; font-weight: 600;">{conf:.0f}%</div>
                     </div>
                     <div style="text-align: center;">
                         <div style="color: rgba(255,255,255,0.5);">R:R</div>
-                        <div style="font-size: 1.2rem; font-weight: 600; color: #00ff88;">1:{rr:.1f}</div>
+                        <div style="font-size: 1.3rem; font-weight: 600; color: #00ff88;">1:{rr:.1f}</div>
                     </div>
                     <div style="text-align: right;">
-                        <div style="color: #fff;">Entry: ₹{opp.get("entry_price", 0):,.2f}</div>
-                        <div style="color: #ff4757;">Stop: ₹{opp.get("stop_loss", 0):,.2f}</div>
-                        <div style="color: #00ff88;">Target: ₹{opp.get("target_1", 0):,.2f}</div>
+                        <div style="color: #fff;">Entry: ₹{entry:,.2f}</div>
+                        <div style="color: #ff4757;">Stop: ₹{stop:,.2f}</div>
+                        <div style="color: #00ff88;">Target: ₹{target:,.2f}</div>
                     </div>
                 </div>
                 """, unsafe_allow_html=True)
+            
+            # Quick tip
+            st.markdown("""
+            <div style="margin-top: 20px; padding: 15px; background: rgba(102,126,234,0.1); border-radius: 12px; border-left: 4px solid #667eea;">
+                💡 <strong>Pro Tip:</strong> Click on Research tab and enter any symbol to get detailed analysis with entry/stop/targets.
+            </div>
+            """, unsafe_allow_html=True)
         else:
-            st.warning("No opportunities match your criteria. Try adjusting filters.")
+            st.warning("No opportunities match your criteria. Try lowering the min score or R:R ratio.")
 
 
 elif page == "🤖 AI Advisor":

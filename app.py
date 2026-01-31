@@ -90,8 +90,6 @@ def check_password():
         
         if st.session_state["password_correct"] == False:
             st.error("😕 Incorrect password")
-        
-        st.caption("Default: `trader123`")
     
     return False
 

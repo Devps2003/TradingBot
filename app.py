@@ -1303,68 +1303,55 @@ elif page == "📊 Scanner":
             st.success(f"🎯 Found {len(opps)} money-making opportunities!")
             
             for opp in opps:
-                # Handle different scan types
-                signal_data = opp.get("signal", {})
-                if isinstance(signal_data, dict):
-                    sig = signal_data.get("signal", "BUY")
-                    conf = signal_data.get("confidence", 70)
-                    rr = signal_data.get("risk_reward_ratio", 2)
-                    entry = signal_data.get("entry_price", 0)
-                    stop = signal_data.get("stop_loss", 0)
-                    target = signal_data.get("targets", {}).get("target_1", 0)
-                else:
-                    sig = opp.get("signal", "BUY")
-                    conf = opp.get("confidence", 70)
-                    rr = opp.get("risk_reward_ratio", 2)
-                    entry = opp.get("entry_price", 0)
-                    stop = opp.get("stop_loss", 0)
-                    target = opp.get("target_1", 0)
-                
-                score = opp.get("overall_score", opp.get("score", 70))
-                symbol = opp.get("symbol", "")
-                
-                sig_color = "#00ff88" if "BUY" in str(sig) else "#ffd93d"
-                
-                # Additional info based on scan type
-                extra_info = ""
-                if scan_type == "🚀 Breakouts":
-                    pattern = opp.get("pattern", "Breakout")
-                    extra_info = f'<div style="color: #ffd93d;">📈 {pattern}</div>'
-                elif scan_type == "🔄 Reversals":
-                    rsi = opp.get("rsi", 0)
-                    div = opp.get("divergence", "")
-                    extra_info = f'<div style="color: #00ff88;">RSI: {rsi:.0f} | {div}</div>'
-                elif scan_type == "💪 Momentum Leaders":
-                    rs = opp.get("rs_score", 0)
-                    alpha = opp.get("alpha_1m", 0)
-                    extra_info = f'<div style="color: #667eea;">RS: {rs:.0f} | Alpha: {alpha:+.1f}%</div>'
-                
-                st.markdown(f"""
-                <div class="glass-card" style="display: flex; justify-content: space-between; align-items: center;">
-                    <div>
-                        <div style="font-size: 1.4rem; font-weight: 700; color: #fff;">{symbol}</div>
-                        <div style="color: {sig_color}; font-weight: 600;">{sig}</div>
-                        {extra_info}
-                    </div>
-                    <div style="text-align: center;">
-                        <div style="color: rgba(255,255,255,0.5);">Score</div>
-                        <div style="font-size: 1.8rem; font-weight: 700;">{score:.0f}</div>
-                    </div>
-                    <div style="text-align: center;">
-                        <div style="color: rgba(255,255,255,0.5);">Confidence</div>
-                        <div style="font-size: 1.3rem; font-weight: 600;">{conf:.0f}%</div>
-                    </div>
-                    <div style="text-align: center;">
-                        <div style="color: rgba(255,255,255,0.5);">R:R</div>
-                        <div style="font-size: 1.3rem; font-weight: 600; color: #00ff88;">1:{rr:.1f}</div>
-                    </div>
-                    <div style="text-align: right;">
-                        <div style="color: #fff;">Entry: ₹{entry:,.2f}</div>
-                        <div style="color: #ff4757;">Stop: ₹{stop:,.2f}</div>
-                        <div style="color: #00ff88;">Target: ₹{target:,.2f}</div>
-                    </div>
-                </div>
-                """, unsafe_allow_html=True)
+                try:
+                    # Handle different scan types
+                    signal_data = opp.get("signal", {})
+                    if isinstance(signal_data, dict):
+                        sig = str(signal_data.get("signal", "BUY"))
+                        conf = float(signal_data.get("confidence", 70) or 70)
+                        rr = float(signal_data.get("risk_reward_ratio", 2) or 2)
+                        entry = float(signal_data.get("entry_price", 0) or 0)
+                        stop = float(signal_data.get("stop_loss", 0) or 0)
+                        targets = signal_data.get("targets", {})
+                        target = float(targets.get("target_1", 0) if isinstance(targets, dict) else 0) or 0
+                    else:
+                        sig = str(opp.get("signal", "BUY"))
+                        conf = float(opp.get("confidence", 70) or 70)
+                        rr = float(opp.get("risk_reward_ratio", 2) or 2)
+                        entry = float(opp.get("entry_price", 0) or 0)
+                        stop = float(opp.get("stop_loss", 0) or 0)
+                        target = float(opp.get("target_1", 0) or 0)
+                    
+                    score = float(opp.get("overall_score", opp.get("score", 70)) or 70)
+                    symbol = str(opp.get("symbol", ""))
+                    
+                    sig_color = "#00ff88" if "BUY" in sig else "#ffd93d"
+                    
+                    # Create card using columns (more reliable than HTML)
+                    col1, col2, col3, col4, col5 = st.columns([2, 1, 1, 1, 2])
+                    
+                    with col1:
+                        st.markdown(f"**{symbol}**")
+                        st.markdown(f":{('green' if 'BUY' in sig else 'orange')}[{sig}]")
+                    
+                    with col2:
+                        st.metric("Score", f"{score:.0f}")
+                    
+                    with col3:
+                        st.metric("Confidence", f"{conf:.0f}%")
+                    
+                    with col4:
+                        st.metric("R:R", f"1:{rr:.1f}")
+                    
+                    with col5:
+                        st.markdown(f"Entry: **₹{entry:,.2f}**")
+                        st.markdown(f":red[Stop: ₹{stop:,.2f}]")
+                        st.markdown(f":green[Target: ₹{target:,.2f}]")
+                    
+                    st.divider()
+                    
+                except Exception as e:
+                    st.warning(f"Error displaying {opp.get('symbol', 'Unknown')}: {e}")
             
             # Quick tip
             st.markdown("""

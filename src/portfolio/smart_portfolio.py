@@ -18,11 +18,13 @@ sys.path.append(str(Path(__file__).parent.parent.parent))
 
 from src.data_fetchers.price_fetcher import PriceFetcher
 from src.utils.helpers import load_json, save_json
+from src.portfolio.cloud_storage import get_cloud_storage
 
 
 class SmartPortfolio:
     """
     Intelligent portfolio manager that tracks everything and provides context.
+    Uses cloud storage (Supabase) when available, with local fallback.
     """
     
     def __init__(self):
@@ -33,13 +35,16 @@ class SmartPortfolio:
         
         self.price_fetcher = PriceFetcher()
         
-        # Load data
+        # Cloud storage (syncs across devices!)
+        self.cloud = get_cloud_storage()
+        
+        # Load data (from cloud if available)
         self.portfolio = self._load_portfolio()
         self.history = self._load_history()
         self.daily_snapshots = self._load_daily_snapshots()
     
     def _load_portfolio(self) -> Dict:
-        """Load portfolio data."""
+        """Load portfolio data from cloud or local."""
         default = {
             "holdings": [],
             "cash": 100000,
@@ -47,6 +52,15 @@ class SmartPortfolio:
             "last_updated": datetime.now().isoformat(),
         }
         
+        # Try cloud first
+        try:
+            data = self.cloud.load_portfolio()
+            if data and data.get("holdings") is not None:
+                return {**default, **data}
+        except:
+            pass
+        
+        # Fallback to local file
         if self.portfolio_file.exists():
             data = load_json(self.portfolio_file)
             return {**default, **data}
@@ -75,13 +89,28 @@ class SmartPortfolio:
         return []
     
     def _save_portfolio(self):
-        """Save portfolio to file."""
+        """Save portfolio to cloud + local."""
         self.portfolio["last_updated"] = datetime.now().isoformat()
+        
+        # Save to cloud (syncs to all devices!)
+        try:
+            self.cloud.save_portfolio(self.portfolio)
+        except:
+            pass
+        
+        # Also save locally as backup
         save_json(self.portfolio, self.portfolio_file)
     
     def _save_history(self):
-        """Save trade history to file."""
+        """Save trade history to cloud + local."""
         save_json({"trades": self.history}, self.history_file)
+    
+    def _save_trade(self, trade: Dict):
+        """Save a single trade to cloud."""
+        try:
+            self.cloud.save_trade(trade)
+        except:
+            pass
     
     def _save_daily_snapshots(self):
         """Save daily snapshots."""
@@ -164,6 +193,7 @@ class SmartPortfolio:
         
         self._save_portfolio()
         self._save_history()
+        self._save_trade(trade)  # Sync to cloud!
         
         return {
             "success": True,
@@ -238,6 +268,7 @@ class SmartPortfolio:
         
         self._save_portfolio()
         self._save_history()
+        self._save_trade(trade)  # Sync to cloud!
         
         return {
             "success": True,
